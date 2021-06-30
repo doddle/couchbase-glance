@@ -47,7 +47,7 @@ def loadKubernetesClient():
         if not contexts:
             logging.error("Cannot find any context in kube-config file.")
             exit(1)
-        config.load_kube_config(config_file=os.getenv('KUBECONFIG', default=f"{Path.home()}/.kube/config"))
+        config.load_kube_config(config_file=os.getenv("KUBECONFIG", default=f"{Path.home()}/.kube/config"))
     return client
 
 
