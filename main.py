@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from kubernetes import client, config
 from tabulate import tabulate
+from pathlib import Path
 
 import os
 import logging
@@ -46,16 +47,8 @@ def loadKubernetesClient():
         if not contexts:
             logging.error("Cannot find any context in kube-config file.")
             exit(1)
-        config.load_kube_config(config_file=getEnvOrFail("KUBECONFIG"))
+        config.load_kube_config(config_file=os.getenv('KUBECONFIG', default=f"{Path.home()}/.kube/config"))
     return client
-
-
-def getEnvOrFail(key):
-    if envVarIsSet(key):
-        return os.environ.get(key)
-    else:
-        logging.error("env var: '{}' is not set".format(key))
-        exit(1)
 
 
 def envVarIsSet(key):
