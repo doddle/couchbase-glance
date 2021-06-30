@@ -34,7 +34,6 @@ def printJson(data):
     print(json.dumps(data, indent=2, sort_keys=True))
 
 
-
 def loadKubernetesClient():
     """
     returns a k8s client object, will attempt to load incluster or KUBECONFIG dynamically
@@ -77,7 +76,6 @@ def main():
     client = loadKubernetesClient()
     client.rest.logger.setLevel(logging.WARNING)  # logging.DEBUG is way to verbose
 
-
     v1 = client.CoreV1Api()
 
     nodeData = []
@@ -85,13 +83,33 @@ def main():
     for node in nodes.items:
         nodeData.append(getNodeInfo(node))
 
+    # TODO: use node labels to determine all CB nodes
+    couchbaseNodeList = []
+    for n in nodeData:
+        x = n[3]
+        if x.startswith("cb"):
+            couchbaseNodeList.append(n)
+
     stats = []
+
+
+    # for x in nodeList:
+    #     print(x[0])
 
     nameSpace = "couchbase"
     expectedLabels = "app=couchbase"
     ret = v1.list_namespaced_pod(nameSpace, label_selector=expectedLabels, watch=False)
     for i in ret.items:
         result = gatherData(i, nodeData)
+
+        # remove node from the couchbaseNodeList (so we have a list of unused nodes)
+        deleteMe = result[1]  # remove this node from our list of nodes as it has CB stuff
+        for j in range(len(couchbaseNodeList)):
+            candidateNode = couchbaseNodeList[j]
+            if candidateNode[0] == deleteMe:
+                couchbaseNodeList.remove(candidateNode)
+                break
+
         stats.append(result)
 
     nameSpace = "couchbase-sync"
@@ -99,8 +117,16 @@ def main():
     ret = v1.list_namespaced_pod(nameSpace, label_selector=expectedLabels, watch=False)
     for i in ret.items:
         result = gatherData(i, nodeData)
-        stats.append(result)
 
+        # remove node from the couchbaseNodeList (so we have a list of unused nodes)
+        deleteMe = result[1]  # remove this node from our list of nodes as it has CB stuff
+        for j in range(len(couchbaseNodeList)):
+            candidateNode = couchbaseNodeList[j]
+            if candidateNode[0] == deleteMe:
+                couchbaseNodeList.remove(candidateNode)
+                break
+
+        stats.append(result)
 
     headers = [
         "ig",
@@ -113,14 +139,25 @@ def main():
         "data",
         "index",
         "query",
-        "search"
+        "search",
     ]
     print(tabulate(stats, headers=headers, tablefmt="simple"))
     print()
     print("found {} total".format(len(stats)))
     print()
-    print("tip: get pods on a node with:\n\n  kubectl get pods --all-namespaces -o wide --field-selector spec.nodeName=<nodename>")
 
+    # print(
+    #     "tip: get pods on a node with:\n\n  kubectl get pods --all-namespaces -o wide --field-selector spec.nodeName=<nodename>"
+    # )
+
+    if len(couchbaseNodeList) > 0 :
+        print("\n------------- Warning -----------------\npotentially unused nodes:")
+        print(tabulate(couchbaseNodeList))
+
+        print("\n\ncheck whats running on these like so:")
+        for x in couchbaseNodeList:
+            str = "# kubectl get pods --all-namespaces --field-selector spec.nodeName={}".format(x[0])
+            print(str)
 
 
 def gatherData(pod, nodeData):
@@ -150,8 +187,9 @@ def gatherData(pod, nodeData):
     result.append(isCbService(labels, "index"))
     result.append(isCbService(labels, "query"))
     result.append(isCbService(labels, "search"))
-        
+
     return result
+
 
 def getNodeInfo(node):
     name = node.metadata.name
@@ -170,7 +208,8 @@ def getNodeInfo(node):
         if k == "node.kubernetes.io/instancegroup":
             role = labels["node.kubernetes.io/instancegroup"]
     ## crappy list.. dict would be better
-    return [ name, zone, size, ig, role]
+    return [name, zone, size, ig, role]
+
 
 def zoneSelector(pod):
     """
@@ -180,8 +219,9 @@ def zoneSelector(pod):
     if nodeSelector != None:
         for x in nodeSelector.keys():
             if x == "failure-domain.beta.kubernetes.io/zone":
-                return nodeSelector['failure-domain.beta.kubernetes.io/zone']
+                return nodeSelector["failure-domain.beta.kubernetes.io/zone"]
     return "NONE"
+
 
 def isCbService(input, kind):
     """
@@ -198,11 +238,10 @@ def isCbService(input, kind):
     return "⭕"
 
 
-
 def podIsCouchbase(input):
     labels = input.metadata.labels
-    if 'app' in labels.keys():
-        if input.metadata.labels['app'] == "couchbase":
+    if "app" in labels.keys():
+        if input.metadata.labels["app"] == "couchbase":
             return True
     return False
 
