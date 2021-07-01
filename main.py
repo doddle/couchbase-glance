@@ -134,6 +134,7 @@ def main():
         "zone",
         "size",
         "pod",
+        "ready",
         "phase",
         "desired zone",
         "data",
@@ -166,6 +167,8 @@ def gatherData(pod, nodeData):
     name = pod.metadata.name
     labels = pod.metadata.labels
     phase = pod.status.phase
+
+    ready = getContainerStatuses(pod)
     # node details
     zone = ""
     size = ""
@@ -181,6 +184,7 @@ def gatherData(pod, nodeData):
     result.append(zone)
     result.append(size)
     result.append(name)
+    result.append(ready)
     result.append(phase)
     result.append(zoneSelector(pod))
     result.append(isCbService(labels, "data"))
@@ -222,6 +226,22 @@ def zoneSelector(pod):
                 return nodeSelector["failure-domain.beta.kubernetes.io/zone"]
     return "NONE"
 
+
+def getContainerStatuses(pod):
+    ready = "?"
+    if pod.status != None :
+        if pod.status.container_statuses != None:
+            statuses = pod.status.container_statuses
+            if len(statuses) > 0:
+                ready = ""
+                for c in statuses:
+                    if c.ready:
+                        ready = ready + "✅"
+                    else:
+                        ready = ready + "⭕"
+
+                return ready
+    return ready
 
 def isCbService(input, kind):
     """
