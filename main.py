@@ -241,7 +241,7 @@ def getContainerStatuses(pod):
                 ready = ""
                 for c in statuses:
                     if c.ready:
-                        if ready is not "✅":
+                        if ready != "✅":
                             ready = ready + "✅"
                     else:
                         ready = ready + "⭕"
