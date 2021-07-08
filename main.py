@@ -224,6 +224,11 @@ def zoneSelector(pod):
         for x in nodeSelector.keys():
             if x == "failure-domain.beta.kubernetes.io/zone":
                 return nodeSelector["failure-domain.beta.kubernetes.io/zone"]
+    podAntiAffinity = pod.spec.affinity.pod_anti_affinity
+    if podAntiAffinity != None:
+        for x in podAntiAffinity.required_during_scheduling_ignored_during_execution:
+            if x.topology_key  == "topology.kubernetes.io/zone":
+                return "az pod antiaffinity"
     return "NONE"
 
 
